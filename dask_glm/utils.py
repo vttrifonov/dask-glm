@@ -10,31 +10,6 @@ from functools import wraps
 from multipledispatch import dispatch
 import sparse
 
-class Mat:
-    def __init__(self, lmean, X, rmean):
-        self.lmean = lmean
-        self.X = X
-        self.rmean = rmean
-
-    def dot(self, y):
-        Xy = np.dot(self.X, y)
-        if self.rmean is not None:
-            Xy = Xy - np.dot(self.rmean, y)
-        if self.lmean is not None:
-            Xy = Xy - self.lmean*y.sum()
-        return Xy
-
-    @property
-    def T(self):
-        return Mat(self.rmean, self.X.T, self.lmean)
-
-    @property
-    def shape(self):
-        return self.X.shape
-
-    @property
-    def _meta(self):
-        return self.X._meta
 
 def normalize(algo):
     @wraps(algo)
@@ -49,16 +24,13 @@ def normalize(algo):
             mean[intercept_idx] = 0
             std[intercept_idx] = 1
             mean = mean if len(intercept_idx[0]) else np.zeros_like(X._meta, shape=mean.shape)
-            if kwargs.get('sparse', False):
-                Xn = Mat(None, X/std, mean/std)
-            else:
-                Xn = Mat(None, (X-mean)/std, None)
+            Xn = (X - mean) / std
             out = algo(Xn, y, *args, **kwargs).copy()
             i_adj = np.sum(out * mean / std)
             out[intercept_idx] -= i_adj
             return out / std
         else:
-            return algo(Mat(None, X, None), y, *args, **kwargs)
+            return algo(X, y, *args, **kwargs)
     return normalize_inputs
 
 
